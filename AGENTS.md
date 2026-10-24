@@ -38,9 +38,11 @@ Reported workflow statuses and activity results are claims, not proof. An incomp
 - `docs/dataset_analysis.md` — verified dataset overview, relationships, sample-output analysis, and pitfalls.
 - `docs/data_dictionary.md` — CSV fields, types, statistics, and evidence schema families.
 - `docs/evidence_inventory.md` — manifest-backed inventory of all 94 evidence files.
+- `src/identity_resolver.py` — deterministic, provenance-preserving request-email identity resolver.
+- `tests/test_identity_resolver.py` — standard-library unit and dataset integration tests for identity resolution.
 - `dataset/` — supplied input, reference, template, and evidence files; preserve unchanged.
 - `dataset/evidence/` — `databases/`, `documents/`, `images/`, `logs/`, and `records/`.
-- No test files or test directories were found in the inspected project tree.
+- At initial inspection, no test files or test directories existed; deterministic identity resolver tests are now present under `tests/`.
 
 # Input Data Schemas
 
@@ -96,7 +98,7 @@ No agent prompts, model names, provider, API calls, or orchestrator implementati
 5. Apply every relevant category/condition in `deletion_rules.csv`; identify remaining data and active data-flow or restore risks.
 6. Construct and validate ordered steps and serialize exactly one row per request to root `output.csv`.
 
-The pipeline, caching behavior, parallelism strategy, and failure/retry behavior are `UNVERIFIED` because no implementation exists.
+The end-to-end pipeline, caching behavior, parallelism strategy, and failure/retry behavior are `UNVERIFIED`; only the standalone identity resolver is implemented.
 
 # Identity Resolution Rules
 
@@ -105,7 +107,9 @@ The pipeline, caching behavior, parallelism strategy, and failure/retry behavior
 - Use available timestamps and the case's `audit_at`; do not use future identity changes or evidence as if they were available at the cutoff.
 - Match evidence through identifiers and other corroborating facts. Do not infer a user match solely from the evidence manifest, a coincidental name, or a reported workflow result.
 - Dataset profiling confirmed each request email maps to one unique user when historical email audit values are included; one email repeats across two request cases. Preserve exact identity matches and handle case/format variation using explicit, justified normalization rather than fuzzy matching.
-- Ambiguous identity matches and exact normalization/alias rules: `UNVERIFIED`; do not guess.
+- The resolver normalizes email only by trimming surrounding whitespace and Unicode case folding. It does not use fuzzy matching, names, or inferred aliases. Final orchestrator handling for `AMBIGUOUS` and `UNRESOLVED` results remains `UNVERIFIED`.
+
+The implemented `src.identity_resolver.IdentityResolver` resolves request email against identity relationships observed at or before `requested_at`; this prevents future identity evidence from identifying the requester. It returns `CONFIRMED`, `AMBIGUOUS`, or `UNRESOLVED`, candidate stable user IDs, the exact matched source record(s), and all supplied identity relationships for one confirmed user observed by `audit_at`. Relationships preserve source file, source row ID, identifier type/value, observation timestamp, and whether the value came from a current snapshot or the old/new side of an audit change. Email matching trims outer whitespace and uses Unicode case folding only; it does not perform fuzzy or name-based matching. Historical phone and email-hash values are returned from explicit audit rows, but do not independently resolve an email request.
 
 # Evidence Provenance Rules
 
@@ -164,7 +168,7 @@ Use only operations and corresponding states defined in `problem_statement.md`. 
 
 # Testing and Evaluation Strategy
 
-- No tests or test framework were found, and both Python files are empty.
+- No test framework was present at initial inspection. The standard-library `unittest` suite now covers the identity resolver; `code/main.py` and `code/evaluation/main.py` remain empty.
 - Use `dataset/sample_deletion_requests.csv` and `dataset/sample_output.csv` as the 32-row public behavior and serialization reference; the sample output contains 10 `COMPLETE` and 22 `INCOMPLETE` cases and no `NOT_APPLICABLE` example.
 - All 32 sample output rows were checked against the requests: coverage and sorting match, all 193 steps have exact keys and consecutive numbering, phase/operation ordering is valid, and all cited evidence IDs resolve to manifest entries. Completed cases contain cited verification steps only; incomplete findings cite evidence and future actions/checks have empty evidence IDs.
 - Sample reported status differs from the expected audited status in multiple cases (including 11 reported `COMPLETE` cases that are `INCOMPLETE` and 3 reported `NOT_STARTED` cases that are `COMPLETE`); do not use reported status as the decision.
@@ -189,10 +193,11 @@ No model calls, provider, model, token usage, or cost data exist yet. Do not fab
 # Known Issues
 
 - The core solution, evidence parsers, identity resolution, policy/state logic, multi-agent components, output generation, and automated validation are not implemented.
-- No tests, root output, evaluation report, or usage report are present. Dataset analysis documents now exist under `docs/`.
+- Identity resolution and its standard-library unit/integration tests now exist under `src/` and `tests/`. No root output, evaluation report, or usage report is present. Dataset analysis documents exist under `docs/`.
 - Exact model/provider, deployment Python version, OCR strategy, and token/cost instrumentation are `UNVERIFIED`. Python 3.14.7 and Pillow were observed only in the current analysis environment.
 - Screenshots require visual or future OCR interpretation; OCR tooling and automated extraction quality are not established.
-- Parsing edge cases, identity collision behavior, and how to represent unsupported evidence are `UNVERIFIED`.
+- The resolver does not infer exact validity intervals from audit events; audit rows preserve an old/new identity relationship at the event timestamp. A submitted email whose only evidence is first observed after `requested_at` remains unresolved and reports the later candidate stable IDs without exposing their other identifiers.
+- Identity resolution is not yet wired into the main orchestrator; ambiguity-handling policy for final case output remains `UNVERIFIED`.
 
 # Decisions Made
 
@@ -201,7 +206,8 @@ No model calls, provider, model, token usage, or cost data exist yet. Do not fab
 - Reserve AI agents for language understanding and unstructured evidence interpretation; keep their results provenance-linked and validate them deterministically.
 - Use only the standard library for the current empty starter implementation; add a dependency only when implementation demonstrates it is necessary.
 - Keep remediation steps prospective and use an empty evidence reference for proposed actions and future checks.
+- Resolve request identity only from evidence observed by request time; gather the confirmed subject's remaining supplied identifiers only through `audit_at`, retaining source and timestamp on every relationship.
 
 # Next Recommended Action
 
-Implement deterministic loaders and schema validation for the verified CSV, JSON, and SQL formats, preserving source file IDs and timestamps. Add tests for historical email resolution and `audit_at` filtering against the public sample, then build the sample evidence readers (including a deliberate OCR strategy decision for PNG evidence) before generating any full-dataset output.
+Wire `IdentityResolver.from_csv` and `resolve_request` into deterministic request processing, then implement and test evidence readers for the verified JSON, SQL, and log formats. Decide how to interpret PNG screenshots (OCR or a bounded visual extraction step) before generating any full-dataset output.
