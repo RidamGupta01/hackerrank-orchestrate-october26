@@ -43,6 +43,9 @@ Reported workflow statuses and activity results are claims, not proof. An incomp
 - `src/evidence_models.py`, `src/evidence_parser.py`, and `src/evidence_collector.py` — normalized evidence contract, format adapters, and manifest-backed identity search.
 - `tests/test_evidence_collector.py` — supplied-dataset and synthetic evidence-adapter tests.
 - `docs/evidence_investigation.md` — evidence parser/collector behavior, supported formats, provenance, temporal basis, and state semantics.
+- `src/activity_analyzer.py` — identity-linked activity timelines and evidence-based flow/restore process assessments for state reconstruction.
+- `tests/test_activity_analyzer.py` — activity correlation, temporal cutoffs, claims, and recovery-path behavior tests.
+- `docs/activity_and_restore_analysis.md` — activity analyzer contract, verified operation taxonomy, and restore/retention caveats.
 - `dataset/` — supplied input, reference, template, and evidence files; preserve unchanged.
 - `dataset/evidence/` — `databases/`, `documents/`, `images/`, `logs/`, and `records/`.
 - At initial inspection, no test files or test directories existed; deterministic identity resolver tests are now present under `tests/`.
@@ -134,6 +137,8 @@ The implemented `src.identity_resolver.IdentityResolver` resolves request email 
 
 - Reconstruct state at each request's `audit_at`; exclude later events and evidence from the decision.
 - Treat `reported_status` and `system_activity.reported_result` as claims. Corroborate resource state using the evidence available in the dataset.
+- `src.activity_analyzer.ActivityAnalyzer` returns identity-linked, time-ordered operational events and flow/restore assessments. `reported_result`, operation rows, and explicit activity identity links remain claims; eligible evidence snapshots establish the observed `ACTIVE`, `DISABLED`, `RESTORABLE`, or `BLOCKED` state. `can_recreate_data` is populated at the audit cutoff only for a snapshot captured exactly at `audit_at`; older snapshots remain historical and later evidence is excluded.
+- The supplied activity taxonomy has `CREATE_EXPORT`, `SYNC_RECORD`, indexing/cache refresh, and restore events but no dedicated backup-creation or import event type. Backup handling follows the actual `BACKUP_ARCHIVE` rule (`rule_14`, `RETAIN` when restore access can be blocked), rather than assuming backups are deleted.
 - Evidence observations distinguish `PRESENT`, explicit `ABSENT`, and `UNKNOWN`, and distinguish historical, audit-time, and later observations. A missing record or an attempted operation is not evidence of absence or success.
 - Evidence parser errors are logged with a manifest evidence ID and exception type only. OCR is local and optional; unavailable OCR produces no inferred image facts.
 - Investigate relevant primary/secondary copies, indexes, exports, logs, analytics, archives, backups, and sync/restore paths where supported by evidence.
@@ -199,6 +204,7 @@ No model calls, provider, model, token usage, or cost data exist yet. Do not fab
 
 - The core solution, evidence parsers, identity resolution, policy/state logic, multi-agent components, output generation, and automated validation are not implemented.
 - Identity resolution and its standard-library unit/integration tests now exist under `src/` and `tests/`. No root output, evaluation report, or usage report is present. Dataset analysis documents exist under `docs/`.
+- Activity analysis is implemented in `src/activity_analyzer.py`; it retains event and file provenance, separates activity claims from corroborated process state, and excludes post-cutoff evidence from historical process assessment. No final deletion statuses are computed by this module.
 - Exact model/provider, deployment Python version, OCR strategy, and token/cost instrumentation are `UNVERIFIED`. Python 3.14.7 and Pillow were observed only in the current analysis environment.
 - Screenshots require visual or future OCR interpretation; OCR tooling and automated extraction quality are not established.
 - The resolver does not infer exact validity intervals from audit events; audit rows preserve an old/new identity relationship at the event timestamp. A submitted email whose only evidence is first observed after `requested_at` remains unresolved and reports the later candidate stable IDs without exposing their other identifiers.
