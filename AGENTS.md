@@ -40,6 +40,9 @@ Reported workflow statuses and activity results are claims, not proof. An incomp
 - `docs/evidence_inventory.md` — manifest-backed inventory of all 94 evidence files.
 - `src/identity_resolver.py` — deterministic, provenance-preserving request-email identity resolver.
 - `tests/test_identity_resolver.py` — standard-library unit and dataset integration tests for identity resolution.
+- `src/evidence_models.py`, `src/evidence_parser.py`, and `src/evidence_collector.py` — normalized evidence contract, format adapters, and manifest-backed identity search.
+- `tests/test_evidence_collector.py` — supplied-dataset and synthetic evidence-adapter tests.
+- `docs/evidence_investigation.md` — evidence parser/collector behavior, supported formats, provenance, temporal basis, and state semantics.
 - `dataset/` — supplied input, reference, template, and evidence files; preserve unchanged.
 - `dataset/evidence/` — `databases/`, `documents/`, `images/`, `logs/`, and `records/`.
 - At initial inspection, no test files or test directories existed; deterministic identity resolver tests are now present under `tests/`.
@@ -66,7 +69,7 @@ Observed policy action values are `DELETE`, `REDACT`, `ANONYMIZE`, and `RETAIN`.
 
 # Evidence Formats
 
-The manifest contains 94 evidence entries, all with existing, unique paths. Their observed file extensions are: 28 `.json`, 26 `.log`, 24 `.sql`, 11 `.png`, 4 `.pdf`, and 1 `.txt`. Evidence is located under the five directories listed above.
+The manifest contains 94 evidence entries, all with existing, unique paths. Their observed file extensions are: 28 `.json`, 26 `.log`, 24 `.sql`, 11 `.png`, 4 `.pdf`, and 1 `.txt`. Evidence is located under the five directories listed above. `src.evidence_collector.EvidenceCollector` searches manifest-listed files using the confirmed identity's current and historical relationships; `src.evidence_parser` supports JSON, JSON Lines, CSV, logs/text, SQLite-compatible SQL, PDF, and image OCR where local optional dependencies are available. See `docs/evidence_investigation.md` for the normalized contract and parser boundaries.
 
 All 28 JSON files were parsed and show multiple record shapes: snapshot bundles, service-resource exports, audit/export records, and analytics/export-job reports. All 24 SQL files were verified and parsed into isolated in-memory SQLite databases; they include normalized service inventory tables, JSON-text primary/replica snapshots, account failover tables, and a search-primary table. Logs use several incompatible text layouts. All four PDFs were text-extracted; all 11 PNG screenshots were visually inspected. Python 3.14.7 and Pillow are present in the analysis environment; a PDF parser was installed only in session storage for this inspection. No OCR engine is installed, and none of these inspection tools is wired into the application.
 
@@ -98,7 +101,7 @@ No agent prompts, model names, provider, API calls, or orchestrator implementati
 5. Apply every relevant category/condition in `deletion_rules.csv`; identify remaining data and active data-flow or restore risks.
 6. Construct and validate ordered steps and serialize exactly one row per request to root `output.csv`.
 
-The end-to-end pipeline, caching behavior, parallelism strategy, and failure/retry behavior are `UNVERIFIED`; only the standalone identity resolver is implemented.
+The end-to-end pipeline and parallelism strategy are `UNVERIFIED`. Identity resolution and manifest-backed evidence collection/normalization are implemented independently; the evidence parser uses a bounded in-process deterministic parse cache. Neither module classifies deletion status.
 
 # Identity Resolution Rules
 
@@ -131,6 +134,8 @@ The implemented `src.identity_resolver.IdentityResolver` resolves request email 
 
 - Reconstruct state at each request's `audit_at`; exclude later events and evidence from the decision.
 - Treat `reported_status` and `system_activity.reported_result` as claims. Corroborate resource state using the evidence available in the dataset.
+- Evidence observations distinguish `PRESENT`, explicit `ABSENT`, and `UNKNOWN`, and distinguish historical, audit-time, and later observations. A missing record or an attempted operation is not evidence of absence or success.
+- Evidence parser errors are logged with a manifest evidence ID and exception type only. OCR is local and optional; unavailable OCR produces no inferred image facts.
 - Investigate relevant primary/secondary copies, indexes, exports, logs, analytics, archives, backups, and sync/restore paths where supported by evidence.
 - Compare relevant SQL snapshots and their capture times when checking replica or restore state. Do not assume a resource or case relationship that the evidence does not support.
 - Lack of evidence is not proof that a record is absent; exact confidence and abstention behavior are `UNVERIFIED` and need implementation.
