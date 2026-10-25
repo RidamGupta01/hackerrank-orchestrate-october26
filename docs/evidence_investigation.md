@@ -47,7 +47,7 @@ Each `EvidenceObservation` retains:
 | `identifiers_found` | Exact supplied current/historical identifiers that matched |
 | `source_evidence_id` | Manifest `file_id`; never synthesized |
 | `source_location` | JSON path, CSV row, SQL table/row, text line, PDF page, or OCR location |
-| `state` | `PRESENT`, `ABSENT`, or `UNKNOWN` |
+| `state` | `PRESENT`, `ABSENT`, `REDACTED`, `ANONYMIZED`, `ACTIVE`, `BLOCKED`, `DISABLED`, or `UNKNOWN` |
 | `temporal_basis` | `HISTORICAL`, `AT_AUDIT`, `AFTER_AUDIT`, or `UNKNOWN` |
 | `is_operation_attempt` | Marks operational events that do not establish resource state |
 | `attributes` | Small, allowlisted status fields or a bounded text excerpt |
@@ -58,6 +58,13 @@ such as `NOT_FOUND`, a miss, or an HTTP 404 readback. A start, retry, queued
 operation, success claim, or lack of a matching record is not proof of absence;
 those remain `UNKNOWN`. Operation attempts are marked and are never converted
 to a presence/absence finding by the collector.
+
+`REDACTED` and `ANONYMIZED` are explicit treatment observations; they do not by
+themselves prove that every policy-required identifier was removed.
+`ACTIVE`, `BLOCKED`, and `DISABLED` represent explicitly parsed process/access
+states and are used for flow or restore analysis, not as record-presence
+states. The state reconstructor independently excludes operation-attempt
+observations when evaluating resource outcomes.
 
 Only an observation timestamp exactly equal to `audit_at` is tagged
 `AT_AUDIT`. Earlier observations remain `HISTORICAL` and later ones

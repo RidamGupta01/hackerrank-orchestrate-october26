@@ -46,6 +46,10 @@ Reported workflow statuses and activity results are claims, not proof. An incomp
 - `src/activity_analyzer.py` — identity-linked activity timelines and evidence-based flow/restore process assessments for state reconstruction.
 - `tests/test_activity_analyzer.py` — activity correlation, temporal cutoffs, claims, and recovery-path behavior tests.
 - `docs/activity_and_restore_analysis.md` — activity analyzer contract, verified operation taxonomy, and restore/retention caveats.
+- `src/policy_engine.py` — dynamic, deterministic interpretation of supplied deletion rules and condition facts.
+- `src/state_reconstructor.py` — cutoff-aware resource/process reconstruction and explicit mandatory-condition outcomes.
+- `tests/test_policy_and_state.py` — policy mapping, provenance, temporal, treatment, and recreation-prevention tests.
+- `docs/policy_and_state_reconstruction.md` — verified policy mappings and contracts for policy/state reconstruction.
 - `dataset/` — supplied input, reference, template, and evidence files; preserve unchanged.
 - `dataset/evidence/` — `databases/`, `documents/`, `images/`, `logs/`, and `records/`.
 - At initial inspection, no test files or test directories existed; deterministic identity resolver tests are now present under `tests/`.
@@ -129,7 +133,10 @@ The implemented `src.identity_resolver.IdentityResolver` resolves request email 
 
 - Read `dataset/deletion_rules.csv` and apply its exact `data_category`, `condition`, and `required_action` to every relevant record.
 - Supported observed actions are `DELETE`, `REDACT`, `ANONYMIZE`, and `RETAIN`; do not infer the correct action from the category name alone.
+- `src.policy_engine.PolicyEngine` loads the CSV's semantic fields at runtime and resolves header aliases independent of column order. Missing/ambiguous fields, duplicate categories, unsupported actions, unknown categories, and unrecognized conditions fail explicitly; no policy is inferred for unknown categories.
+- Conditions are evaluated from explicit boolean facts. A missing required fact is unresolved, and unknown category/action/condition mappings cannot satisfy a requirement. `src/policy_engine.py` documents the exact condition-fact contract.
 - Apply the documented tombstone condition precisely: where applicable, preserve the stable internal `user_id` reference and remove direct identifiers required by the redaction rule.
+- The verified `rule_15` tombstone exception permits only stable `user_id` retention under its exact supplied condition; direct identifiers and `email_hash` must still be explicitly removed. `REDACT`/`ANONYMIZE` decisions expose required field types; policy decisions themselves do not prove treatment.
 - Preserve records required by retention or legal-hold conditions while removing or unlinking identifiers as required elsewhere.
 - A deletion is complete only when all relevant copies have the required treatment, required retained records remain, and no active process can recreate prohibited data.
 
@@ -140,10 +147,16 @@ The implemented `src.identity_resolver.IdentityResolver` resolves request email 
 - `src.activity_analyzer.ActivityAnalyzer` returns identity-linked, time-ordered operational events and flow/restore assessments. `reported_result`, operation rows, and explicit activity identity links remain claims; eligible evidence snapshots establish the observed `ACTIVE`, `DISABLED`, `RESTORABLE`, or `BLOCKED` state. `can_recreate_data` is populated at the audit cutoff only for a snapshot captured exactly at `audit_at`; older snapshots remain historical and later evidence is excluded.
 - The supplied activity taxonomy has `CREATE_EXPORT`, `SYNC_RECORD`, indexing/cache refresh, and restore events but no dedicated backup-creation or import event type. Backup handling follows the actual `BACKUP_ARCHIVE` rule (`rule_14`, `RETAIN` when restore access can be blocked), rather than assuming backups are deleted.
 - Evidence observations distinguish `PRESENT`, explicit `ABSENT`, and `UNKNOWN`, and distinguish historical, audit-time, and later observations. A missing record or an attempted operation is not evidence of absence or success.
+- The shared state enum also supports explicit `REDACTED`, `ANONYMIZED`, `ACTIVE`, `BLOCKED`, and `DISABLED` observations. Record-treatment evidence and process-state evidence remain distinct; attempts remain unknown unless separate evidence establishes their result.
 - Evidence parser errors are logged with a manifest evidence ID and exception type only. OCR is local and optional; unavailable OCR produces no inferred image facts.
 - Investigate relevant primary/secondary copies, indexes, exports, logs, analytics, archives, backups, and sync/restore paths where supported by evidence.
 - Compare relevant SQL snapshots and their capture times when checking replica or restore state. Do not assume a resource or case relationship that the evidence does not support.
 - Lack of evidence is not proof that a record is absent; exact confidence and abstention behavior are `UNVERIFIED` and need implementation.
+- `src.state_reconstructor.StateReconstructor` requires the activity and identity `audit_at` cutoffs to match. It considers only confirmed identity-linked records; cutoff-captured snapshots can establish audit-time state, but historical-only evidence cannot establish the cutoff state. Attempt observations are never accepted as outcomes; contradictory cutoff states fail; missing state remains unresolved.
+- For applicable `DELETE` rules, explicit cutoff-valid `ABSENT` is required. `REDACT`/`ANONYMIZE` require explicit treatment state and evidence covering all policy-required identifier types, including email hashes. `RETAIN` requires explicit cutoff-valid `PRESENT` state. These conditions fail or remain unresolved rather than silently succeeding.
+- Cutoff-valid `ACTIVE`/`RESTORABLE` data-flow or restore-path assessments fail recreation prevention; cutoff-valid `DISABLED`/`BLOCKED` assessments satisfy it. Historical, claim-only, or unknown process state remains unresolved. A retained backup can satisfy retention while remaining a separate restore risk; rule 14 does not imply backup deletion.
+- If no identity-linked flow or restore-path assessment exists, recreation-path coverage is unresolved rather than implicitly safe.
+- The state reconstructor returns `COMPLETE` only when all generated mandatory conditions are satisfied or explicitly inapplicable, `INCOMPLETE` for any failed/unresolved condition, and `NOT_APPLICABLE` only for provenance-backed evidence that deletion was not requested. It does not produce remediation steps.
 
 # Output Schema
 

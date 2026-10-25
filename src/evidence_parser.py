@@ -249,6 +249,17 @@ def _mapping_state(value: Mapping[str, Any]) -> tuple[RecordState, bool]:
     )
     if attempt:
         return RecordState.UNKNOWN, True
+    if compact_statuses.intersection({"redacted", "redactedsuccessfully"}):
+        return RecordState.REDACTED, attempt
+    if compact_statuses.intersection({"anonymized", "anonymised"}):
+        return RecordState.ANONYMIZED, attempt
+    if compact_statuses.intersection({"disabled", "stopped", "inactive", "blocked"}):
+        return (
+            RecordState.BLOCKED
+            if "blocked" in compact_statuses
+            else RecordState.DISABLED,
+            attempt,
+        )
     if compact_statuses.intersection({"notfound", "nomatch", "404", "miss", "absent"}):
         return RecordState.ABSENT, attempt
     if compact_statuses.intersection({"found", "present", "hit", "identifiable", "active"}):
@@ -266,13 +277,22 @@ def _safe_attributes(value: Mapping[str, Any]) -> dict[str, Any]:
         "result", "status", "state", "status_code", "http_status", "event",
         "event_name", "operation", "enabled", "restore_allowed", "account_status",
         "updated_at", "indexed_at", "event_time", "observed_at", "recorded_at",
-        "captured_at",
+        "captured_at", "redacted_fields", "fields_redacted",
+        "removed_identifiers", "identifiers_removed", "anonymized",
+        "anonymized_fields",
     }
-    return {
-        key: item
-        for key, item in value.items()
-        if key.casefold() in allowed and isinstance(item, (str, int, float, bool, type(None)))
-    }
+    attributes: dict[str, Any] = {}
+    for key, item in value.items():
+        if key.casefold() not in allowed:
+            continue
+        if isinstance(item, (str, int, float, bool, type(None))):
+            attributes[key] = item
+        elif key.casefold() in {
+            "redacted_fields", "fields_redacted", "removed_identifiers",
+            "identifiers_removed", "anonymized_fields",
+        } and isinstance(item, list) and all(isinstance(element, str) for element in item):
+            attributes[key] = tuple(item)
+    return attributes
 
 
 def _parse_json(source: Path) -> tuple[ParsedEvidenceRecord, ...]:

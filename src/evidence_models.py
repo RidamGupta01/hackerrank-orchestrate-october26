@@ -11,6 +11,11 @@ from typing import Any, Mapping
 class RecordState(str, Enum):
     PRESENT = "PRESENT"
     ABSENT = "ABSENT"
+    REDACTED = "REDACTED"
+    ANONYMIZED = "ANONYMIZED"
+    ACTIVE = "ACTIVE"
+    BLOCKED = "BLOCKED"
+    DISABLED = "DISABLED"
     UNKNOWN = "UNKNOWN"
 
 
